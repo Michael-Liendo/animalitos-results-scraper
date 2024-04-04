@@ -1,6 +1,9 @@
 use chrono::Duration;
 use chrono::NaiveDate;
+use csv::Writer;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 #[derive(Debug)]
 struct LotteryResult {
@@ -9,9 +12,15 @@ struct LotteryResult {
 }
 
 fn main() {
-    let start_date = NaiveDate::from_ymd_opt(2024, 3, 4).unwrap();
-    let end_date = NaiveDate::from_ymd_opt(2024, 4, 25).unwrap();
+    let start_date = NaiveDate::from_ymd_opt(2022, 01, 01).unwrap();
+    let end_date = NaiveDate::from_ymd_opt(2024, 4, 1).unwrap();
 
+    let mut writer = Writer::from_path("results.csv").unwrap();
+    writer.write_record(&["animal", "hour", "date"]).unwrap();
+
+    let results_mutex = Arc::new(Mutex::new(HashMap::new()));
+
+    let mut threads = Vec::new();
     for current_date in start_date.iter_weeks().take_while(|d| *d <= end_date) {
         let formatted_date = current_date.format("%Y/%m/%d").to_string();
         let url = format!(
@@ -20,22 +29,49 @@ fn main() {
         );
         println!("Getting the results for the date: {}", url);
 
-        let response = reqwest::blocking::get(url);
-        // get the HTML content from the request response
-        // and print it
-        let html_content = response.unwrap().text().unwrap();
+        let results_mutex_clone = results_mutex.clone();
+        let thread = thread::spawn(move || {
+            let response = reqwest::blocking::get(url);
+            // get the HTML content from the request response
+            // and print it
+            let html_content = response.unwrap().text().unwrap();
 
-        let document = scraper::Html::parse_document(&html_content);
+            let document = scraper::Html::parse_document(&html_content);
 
-        let lottery_name = get_the_lottery_name(&document);
-        println!("The lottery name is: {}", lottery_name);
+            let results = get_the_lottery_week_results(&document);
 
-        // get_the_lottery_week_results(&document);
+            let mut results_guard = results_mutex_clone.lock().unwrap();
+            for (date, lottery_results) in results {
+                for result in lottery_results {
+                    if result.animal == "-" {
+                        continue;
+                    }
+                    results_guard
+                        .entry(date)
+                        .or_insert_with(Vec::new)
+                        .push(result);
+                }
+            }
+        });
+        threads.push(thread);
+    }
+
+    // Wait for all threads to finish
+    for thread in threads {
+        thread.join().unwrap();
+    }
+
+    let results = results_mutex.lock().unwrap();
+    for (date, lottery_results) in results.iter() {
+        for result in lottery_results {
+            writer
+                .write_record(&[&result.animal, &result.hour, &date.to_string()])
+                .unwrap();
+        }
     }
 }
 
 // get the lottery first date
-
 fn get_the_lottery_week_results(
     document: &scraper::Html,
 ) -> HashMap<NaiveDate, Vec<LotteryResult>> {
@@ -116,6 +152,7 @@ fn get_the_lottery_hour_results(document: &scraper::Html) -> Vec<String> {
     return results;
 }
 
+#[allow(dead_code)]
 fn get_the_lottery_name(document: &scraper::Html) -> String {
     let html_lottery_selector = scraper::Selector::parse(
         "#main > div.tema > div:nth-child(5) > div.col-md-8.resultados.table-responsive > h2",
