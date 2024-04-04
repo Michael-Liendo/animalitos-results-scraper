@@ -17,16 +17,17 @@ fn main() {
 
     let document = scraper::Html::parse_document(&html_content);
 
-    /* let lottery_name = get_the_lottery_name(&document);
-       println!("The lottery name is: {}", lottery_name);
-    */
+    let lottery_name = get_the_lottery_name(&document);
+    println!("The lottery name is: {}", lottery_name);
 
     get_the_lottery_week_results(&document);
 }
 
 // get the lottery first date
 
-fn get_the_lottery_week_results(document: &scraper::Html) {
+fn get_the_lottery_week_results(
+    document: &scraper::Html,
+) -> HashMap<NaiveDate, Vec<LotteryResult>> {
     let initial_date = get_the_lottery_first_date(&document).unwrap();
 
     // hash map to store the results by date
@@ -48,23 +49,21 @@ fn get_the_lottery_week_results(document: &scraper::Html) {
 
     let chunks = all_rows.chunks(7);
 
-    for chunk in chunks {
+    for (chunk, hour) in chunks.zip(lottery_hours.iter().cloned()) {
         let mut date = initial_date;
 
         for item in chunk {
             let entry = results_by_date.entry(date).or_insert_with(Vec::new);
             entry.push(LotteryResult {
                 animal: item.to_string(),
-                hour: ,
+                hour: hour.clone(),
             });
 
             date = date + Duration::days(1);
         }
     }
 
-    for (date, results) in &results_by_date {
-        println!("Date: {}, Results: {:?} \n", date, results);
-    }
+    return results_by_date;
 }
 
 fn get_the_lottery_first_date(document: &scraper::Html) -> Option<NaiveDate> {
