@@ -9,18 +9,29 @@ struct LotteryResult {
 }
 
 fn main() {
-    let response =
-        reqwest::blocking::get("https://www.tuazar.com/loteria/animalitos/resultados/2024/03/25/");
-    // get the HTML content from the request response
-    // and print it
-    let html_content = response.unwrap().text().unwrap();
+    let start_date = NaiveDate::from_ymd_opt(2024, 3, 4).unwrap();
+    let end_date = NaiveDate::from_ymd_opt(2024, 4, 25).unwrap();
 
-    let document = scraper::Html::parse_document(&html_content);
+    for current_date in start_date.iter_weeks().take_while(|d| *d <= end_date) {
+        let formatted_date = current_date.format("%Y/%m/%d").to_string();
+        let url = format!(
+            "https://www.tuazar.com/loteria/animalitos/resultados/{}",
+            formatted_date
+        );
+        println!("Getting the results for the date: {}", url);
 
-    let lottery_name = get_the_lottery_name(&document);
-    println!("The lottery name is: {}", lottery_name);
+        let response = reqwest::blocking::get(url);
+        // get the HTML content from the request response
+        // and print it
+        let html_content = response.unwrap().text().unwrap();
 
-    get_the_lottery_week_results(&document);
+        let document = scraper::Html::parse_document(&html_content);
+
+        let lottery_name = get_the_lottery_name(&document);
+        println!("The lottery name is: {}", lottery_name);
+
+        // get_the_lottery_week_results(&document);
+    }
 }
 
 // get the lottery first date
