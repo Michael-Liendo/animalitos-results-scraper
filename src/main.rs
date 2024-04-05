@@ -12,7 +12,7 @@ struct LotteryResult {
 }
 
 fn main() {
-    let start_date = NaiveDate::from_ymd_opt(2022, 01, 01).unwrap();
+    let start_date = NaiveDate::from_ymd_opt(2020, 01, 01).unwrap();
     let end_date = NaiveDate::from_ymd_opt(2024, 4, 1).unwrap();
 
     let mut writer = Writer::from_path("results.csv").unwrap();
